@@ -13,7 +13,7 @@ This project is a web application that helps users find food resources in their 
 
 ## Data Source
 
-The data used in this project was sourced from [insert your data source here, e.g., "a comprehensive survey of food resources in West Virginia"]. It includes information such as:
+The data used in this project was sourced from the WVU Center for Resilient Communities. It includes information such as:
 
 - Store names and locations
 - Store categories (e.g., grocery stores, food pantries, farmers markets)
@@ -48,7 +48,7 @@ Contributions to improve the project are welcome. Please follow these steps:
 
 ## License
 
-[Insert your chosen license here]
+
 
 ## Acknowledgements
 
