@@ -7,7 +7,9 @@ import StoreIcon from '@mui/icons-material/Store';
 import ShopIcon from '@mui/icons-material/Shop';
 import SpaIcon from '@mui/icons-material/Spa'; // Icon for Fresh Produce
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney'; // Icon for SNAP
-
+import LocalConvenienceStoreIcon from '@mui/icons-material/LocalConvenienceStore';
+import BusinessIcon from '@mui/icons-material/Business';
+import TypeSpecimenIcon from '@mui/icons-material/TypeSpecimen';
 const SelectionBox = ({ filterStores }) => {
   const [category, setCategory] = useState('');
   const [freshProduce, setFreshProduce] = useState(false);
@@ -47,7 +49,7 @@ const SelectionBox = ({ filterStores }) => {
             <Typography variant="caption">Farmers Market</Typography>
           </ToggleButton>
           <ToggleButton value="Small Box" aria-label="Small Box">
-            <StoreIcon style={{ fontSize: '2.5rem' }} />
+            <LocalConvenienceStoreIcon style={{ fontSize: '2.5rem' }} />
             <Typography variant="caption">Small Box</Typography>
           </ToggleButton>
         </ToggleButtonGroup>
@@ -65,9 +67,13 @@ const SelectionBox = ({ filterStores }) => {
             <StorefrontIcon style={{ fontSize: '2.5rem' }} />
             <Typography variant="caption">Convenience</Typography>
           </ToggleButton>
-          <ToggleButton value="Other" aria-label="Other">
-            <ShopIcon style={{ fontSize: '2.5rem' }} />
-            <Typography variant="caption">Other</Typography>
+          <ToggleButton value="Big Box" aria-label="Big Box">
+            <BusinessIcon style={{ fontSize: '2.5rem' }} />
+            <Typography variant="caption">Big Box</Typography>
+          </ToggleButton>
+          <ToggleButton value="Specialty" aria-label="Specialty">
+            <TypeSpecimenIcon style={{ fontSize: '2.5rem' }} />
+            <Typography variant="caption">Specialty</Typography>
           </ToggleButton>
         </ToggleButtonGroup>
       </Box>
@@ -95,7 +101,7 @@ const SelectionBox = ({ filterStores }) => {
               onChange={handleSnapChange}
             />
           }
-          label={<Typography variant="caption">Accepts SNAP</Typography>}
+          label={<Typography variant="caption">Accepts WIC</Typography>}
         />
       </Box>
     </Box>

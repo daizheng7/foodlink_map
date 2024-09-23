@@ -103,11 +103,11 @@ const NearbyStoresViz = ({ stores }) => {
     );
   };
 
-  const renderSnapAndProduceStats = () => {
+  const renderWICAndProduceStats = () => {
     const totalStores = nearbyStores.length;
-    const snapStores = nearbyStores.filter(store => store.SNAP).length;
+    const WICStores = nearbyStores.filter(store => store.WIC).length;
     const produceStores = nearbyStores.filter(store => store['Fresh Produce']).length;
-    const snapPercentage = (snapStores / totalStores * 100).toFixed(1);
+    const WICPercentage = (WICStores / totalStores * 100).toFixed(1);
     const producePercentage = (produceStores / totalStores * 100).toFixed(1);
 
     return (
@@ -124,13 +124,13 @@ const NearbyStoresViz = ({ stores }) => {
             boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
           }}>
             <Typography variant="h2" sx={{ fontWeight: 'bold', color: '#4CAF50' }}>
-              {snapPercentage}%
+              {WICPercentage}%
             </Typography>
             <Typography variant="h5">
-              Accept SNAP
+              Accept WIC
             </Typography>
             <Typography variant="body1">
-              ({snapStores} stores)
+              ({WICStores} stores)
             </Typography>
           </Box>
           <Box sx={{ 
@@ -172,7 +172,7 @@ const NearbyStoresViz = ({ stores }) => {
               {renderPieChart()}
             </Box>
             <Box sx={{ width: '100%' }}>
-              {renderSnapAndProduceStats()}
+              {renderWICAndProduceStats()}
             </Box>
           </Box>
         </>

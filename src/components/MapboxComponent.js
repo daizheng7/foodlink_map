@@ -1,7 +1,7 @@
 import React, { useState, useRef, useMemo, useCallback } from 'react';
-import Map, { Marker, GeolocateControl, Popup } from 'react-map-gl';
+import Map, { Marker, GeolocateControl, Popup, NavigationControl } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { Button, Typography, Box, Link, Chip } from '@mui/material';
+import { Button, Typography, Box, Link, Chip, Paper } from '@mui/material';
 import MyLocationIcon from '@mui/icons-material/MyLocation';
 import LocalGroceryStoreIcon from '@mui/icons-material/LocalGroceryStore';
 import ShoppingBasketIcon from '@mui/icons-material/ShoppingBasket';
@@ -9,11 +9,14 @@ import StoreIcon from '@mui/icons-material/Store';
 import StorefrontIcon from '@mui/icons-material/Storefront';
 import ShopIcon from '@mui/icons-material/Shop';
 import Supercluster from 'supercluster';
-
+import LocalConvenienceStoreIcon from '@mui/icons-material/LocalConvenienceStore';
+import LocalMallIcon from '@mui/icons-material/LocalMall';
+import BusinessIcon from '@mui/icons-material/Business';
+import TypeSpecimenIcon from '@mui/icons-material/TypeSpecimen';
 const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN;
 
 const categoryData = {
-  "Grocery Store": {
+  "Grocery": {
     color: "#4285F4",
     icon: <LocalGroceryStoreIcon />
   },
@@ -21,17 +24,21 @@ const categoryData = {
     color: "#0F9D58",
     icon: <ShoppingBasketIcon />
   },
-  "Convenience Store": {
+  "Convenience": {
     color: "#F4B400",
     icon: <StorefrontIcon />
   },
-  "Small Store": {
+  "Small Box": {
     color: "#DB4437",
-    icon: <StoreIcon />
+    icon: <LocalMallIcon />
   },
-  "Other": {
+  "Specialty": {
+    color: "#DB4437",
+    icon: <TypeSpecimenIcon />
+  },
+  "Big Box": {
     color: "#757575",
-    icon: <ShopIcon />
+    icon: <BusinessIcon />
   }
 };
 
@@ -39,139 +46,151 @@ function getGoogleMapsUrl(address) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 }
 
-function generateClusters(stores, zoom) {
-  const index = new Supercluster({
-    radius: 40,
-    maxZoom: 16,
-    map: props => ({ category: props.category })
-  });
-  
-  index.load(stores.map(store => ({
-    type: 'Feature',
-    properties: { 
-      cluster: false, 
-      storeId: store.id, 
-      category: store['Retail Category'] 
-    },
-    geometry: {
-      type: 'Point',
-      coordinates: [parseFloat(store.Longitude), parseFloat(store.Latitude)]
-    }
-  })));
-
-  return index.getClusters([-180, -85, 180, 85], zoom);
-}
-
-const Legend = () => (
-  <Box
-    sx={{
-      position: 'absolute',
-      bottom: 60,
-      right: 20,
-      backgroundColor: 'white',
-      padding: 2,
-      borderRadius: 2,
-      boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
-    }}
-  >
-    <Typography variant="subtitle1" gutterBottom>Store Types</Typography>
-    {Object.entries(categoryData).map(([category, data]) => (
-      <Box key={category} sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-        <Box sx={{ color: data.color, mr: 1 }}>{data.icon}</Box>
-        <Typography variant="body2">{category}</Typography>
-      </Box>
-    ))}
-  </Box>
-);
-
 const MapboxComponent = ({ stores }) => {
-    const [viewport, setViewport] = useState({
-      latitude: 39,
-      longitude: -80,
-      zoom: 8,
+  const [viewport, setViewport] = useState({
+    latitude: 39,
+    longitude: -80,
+    zoom: 7,
+  });
+  const [popupInfo, setPopupInfo] = useState(null);
+  const mapRef = useRef();
+  const geolocateControlRef = useRef();
+
+  const categorizedPoints = useMemo(() => {
+    const categories = {};
+    stores.forEach(store => {
+      const category = store['Retail Category'];
+      if (!categories[category]) {
+        categories[category] = [];
+      }
+      categories[category].push({
+        type: 'Feature',
+        properties: {
+          cluster: false,
+          storeId: store.id,
+          category: category,
+          ...store
+        },
+        geometry: {
+          type: 'Point',
+          coordinates: [parseFloat(store.Longitude), parseFloat(store.Latitude)]
+        }
+      });
     });
-    const [popupInfo, setPopupInfo] = useState(null);
-    const geolocateControlRef = useRef();
+    return categories;
+  }, [stores]);
 
-    const clusters = useMemo(() => generateClusters(stores, viewport.zoom), [stores, viewport.zoom]);
+  const superclusterRefs = useMemo(() => {
+    const refs = {};
+    Object.keys(categorizedPoints).forEach(category => {
+      refs[category] = new Supercluster({
+        radius: 150,
+        maxZoom: 6,
+      });
+      refs[category].load(categorizedPoints[category]);
+    });
+    return refs;
+  }, [categorizedPoints]);
 
-    const handleUseMyLocation = useCallback(() => {
-      geolocateControlRef.current?.trigger();
-    }, []);
+  const clusters = useMemo(() => {
+    if (!mapRef.current) return {};
 
-    return (
-        <div style={{ width: '100%', height: '60vh', position: 'relative', overflow: 'hidden' }}>
-        <Map
-          initialViewState={viewport}
-          mapboxAccessToken={MAPBOX_TOKEN}
-          style={{ width: '100%', height: '100%' }}
-          mapStyle="mapbox://styles/mapbox/streets-v11"
-          onMove={(evt) => setViewport(evt.viewState)}
-        >
-          <GeolocateControl
-            ref={geolocateControlRef}
-            positionOptions={{ enableHighAccuracy: true }}
-            trackUserLocation={true}
-            showUserHeading={true}
-            style={{
-              position: 'absolute',
-              top: 10,
-              left: 10,
-              zIndex: 1
-            }}
-          />
-          
-          {clusters.map((cluster) => {
+    const bounds = mapRef.current.getBounds().toArray().flat();
+    const zoom = Math.floor(viewport.zoom);
+
+    const categoryClusters = {};
+    Object.keys(superclusterRefs).forEach(category => {
+      categoryClusters[category] = superclusterRefs[category].getClusters(bounds, zoom);
+    });
+    return categoryClusters;
+  }, [superclusterRefs, viewport.zoom]);
+
+  const handleClusterClick = useCallback((clusterId, longitude, latitude, category) => {
+    const expansionZoom = Math.min(superclusterRefs[category].getClusterExpansionZoom(clusterId), 20);
+    setViewport({
+      ...viewport,
+      longitude,
+      latitude,
+      zoom: expansionZoom,
+      transitionDuration: 500
+    });
+  }, [superclusterRefs, viewport]);
+
+  const handleUseMyLocation = () => {
+    geolocateControlRef.current?.trigger();
+  };
+
+  return (
+    <div style={{ width: '100%', height: '60vh', position: 'relative', overflow: 'hidden' }}>
+      <Map
+        ref={mapRef}
+        initialViewState={viewport}
+        mapboxAccessToken={MAPBOX_TOKEN}
+        style={{ width: '100%', height: '100%' }}
+        mapStyle="mapbox://styles/mapbox/streets-v11"
+        onMove={(evt) => setViewport(evt.viewState)}
+      >
+        <GeolocateControl
+          ref={geolocateControlRef}
+          positionOptions={{ enableHighAccuracy: true }}
+          trackUserLocation={true}
+          showUserHeading={true}
+          style={{
+            position: 'absolute',
+            top: 10,
+            left: 10,
+            zIndex: 1
+          }}
+        />
+        <NavigationControl position="top-right" />
+        
+        {Object.entries(clusters).map(([category, categoryClusters]) => 
+          categoryClusters.map(cluster => {
             const [longitude, latitude] = cluster.geometry.coordinates;
-            const { cluster: isCluster, point_count: pointCount, category: clusterCategory } = cluster.properties;
+            const { cluster: isCluster, point_count: pointCount } = cluster.properties;
+
+            const categoryInfo = categoryData[category] || categoryData["Other"];
 
             if (isCluster) {
-              const clusterColor = categoryData[clusterCategory]?.color || '#757575';
-
               return (
                 <Marker
-                  key={`cluster-${cluster.id}`}
+                  key={`cluster-${category}-${cluster.id}`}
                   latitude={latitude}
                   longitude={longitude}
                 >
-                  <div
-                    style={{
-                      width: `${20 + (pointCount / stores.length) * 30}px`,
-                      height: `${20 + (pointCount / stores.length) * 30}px`,
+                  <Box
+                    onClick={() => handleClusterClick(cluster.id, longitude, latitude, category)}
+                    sx={{
+                      width: `${10 + (pointCount / categorizedPoints[category].length) * 30}px`,
+                      height: `${10 + (pointCount / categorizedPoints[category].length) * 30}px`,
                       borderRadius: '50%',
-                      backgroundColor: clusterColor,
+                      backgroundColor: categoryInfo.color,
                       display: 'flex',
                       justifyContent: 'center',
                       alignItems: 'center',
                       color: 'white',
-                      border: '2px solid #fff',
                       cursor: 'pointer',
-                      fontSize: '12px',
+                      fontSize: 12,
                       fontWeight: 'bold',
+                      border: '2px solid white',
                     }}
                   >
                     {pointCount}
-                  </div>
+                  </Box>
                 </Marker>
               );
             }
 
-            const store = stores.find(s => s.id === cluster.properties.storeId);
-            const storeCategory = categoryData[store['Retail Category']] || categoryData["Other"];
-
             return (
               <Marker
-                key={`store-${store.id}`}
+                key={`store-${cluster.properties.storeId}`}
                 latitude={latitude}
                 longitude={longitude}
-                onClick={e => {
-                  e.originalEvent.stopPropagation();
-                  setPopupInfo(store);
-                }}
               >
                 <Box 
+                  onClick={() => setPopupInfo(cluster.properties)}
                   sx={{ 
-                    color: storeCategory.color, 
+                    color: categoryInfo.color, 
                     backgroundColor: 'white',
                     borderRadius: '50%',
                     padding: '4px',
@@ -183,76 +202,107 @@ const MapboxComponent = ({ stores }) => {
                     }
                   }}
                 >
-                  {storeCategory.icon}
+                  {categoryInfo.icon}
                 </Box>
               </Marker>
             );
-          })}
+          })
+        )}
 
-          {popupInfo && (
-            <Popup
-              anchor="top"
-              latitude={parseFloat(popupInfo.Latitude)}
-              longitude={parseFloat(popupInfo.Longitude)}
-              onClose={() => setPopupInfo(null)}
-              closeOnClick={false}
-            >
-              <Box sx={{ p: 2, maxWidth: 250 }}>
-                <Typography variant="h6" gutterBottom>{popupInfo['Store_Name']}</Typography>
-                <Typography variant="body2" gutterBottom>{popupInfo['Address']}</Typography>
-                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', my: 1 }}>
-                  <Chip 
-                    label={popupInfo['SNAP'] ? 'Accepts SNAP' : 'No SNAP'} 
-                    color={popupInfo['SNAP'] ? 'primary' : 'default'} 
-                    size="small"
-                  />
-                  <Chip 
-                    label={popupInfo['Fresh Produce'] ? 'Fresh Produce' : 'No Fresh Produce'} 
-                    color={popupInfo['Fresh Produce'] ? 'success' : 'default'} 
-                    size="small"
-                  />
-                </Box>
-                <Link 
-                  href={getGoogleMapsUrl(popupInfo['Address'])} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  sx={{ 
-                    display: 'inline-block', 
-                    mt: 1,
-                    color: 'primary.main',
-                    '&:hover': {
-                      textDecoration: 'underline'
-                    }
-                  }}
-                >
-                  View on Google Maps
-                </Link>
+        {popupInfo && (
+          <Popup
+            anchor="top"
+            latitude={parseFloat(popupInfo.Latitude)}
+            longitude={parseFloat(popupInfo.Longitude)}
+            onClose={() => setPopupInfo(null)}
+            closeOnClick={false}
+          >
+            <Box sx={{ p: 2, maxWidth: 250 }}>
+              <Typography variant="h6" gutterBottom>{popupInfo['Store_Name']}</Typography>
+              <Typography variant="body2" gutterBottom>{popupInfo['Address']}</Typography>
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', my: 1 }}>
+                <Chip 
+                  label={popupInfo['WIC'] ? 'Accepts WIC' : 'No WIC'} 
+                  color={popupInfo['WIC'] ? 'primary' : 'default'} 
+                  size="small"
+                />
+                <Chip 
+                  label={popupInfo['Fresh Produce'] ? 'Fresh Produce' : 'No Fresh Produce'} 
+                  color={popupInfo['Fresh Produce'] ? 'success' : 'default'} 
+                  size="small"
+                />
               </Box>
-            </Popup>
-          )}
-        </Map>
-        <Legend />
-        <Button
-          variant="contained"
-          startIcon={<MyLocationIcon />}
-          onClick={handleUseMyLocation}
-          sx={{
-            position: 'absolute',
-            bottom: 20,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 1,
-            backgroundColor: 'primary.main',
-            color: 'white',
-            '&:hover': {
-              backgroundColor: 'primary.dark',
-            }
-          }}
-        >
-          Use My Location
-        </Button>
-      </div>
-    );
+              <Link 
+                href={getGoogleMapsUrl(popupInfo['Address'])} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                sx={{ 
+                  display: 'inline-block', 
+                  mt: 1,
+                  color: 'primary.main',
+                  '&:hover': {
+                    textDecoration: 'underline'
+                  }
+                }}
+              >
+                View on Google Maps
+              </Link>
+            </Box>
+          </Popup>
+        )}
+      </Map>
+      <Button
+        variant="contained"
+        startIcon={<MyLocationIcon />}
+        onClick={handleUseMyLocation}
+        sx={{
+          position: 'absolute',
+          bottom: 20,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 1,
+          backgroundColor: 'primary.main',
+          color: 'white',
+          '&:hover': {
+            backgroundColor: 'primary.dark',
+          }
+        }}
+      >
+        Use My Location
+      </Button>
+      <Paper
+        elevation={3}
+        sx={{
+          position: 'absolute',
+          bottom: 20,
+          right: 20,
+          padding: 2,
+          backgroundColor: 'rgba(255, 255, 255, 0.8)',
+        }}
+      >
+        <Typography variant="h6" gutterBottom>Legend</Typography>
+        {Object.entries(categoryData).map(([category, data]) => (
+          <Box key={category} sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+            <Box sx={{ 
+              width: 20, 
+              height: 20, 
+              borderRadius: '50%', 
+              backgroundColor: data.color, 
+              mr: 1,
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              color: 'white',
+              fontSize: 12
+            }}>
+              {data.icon}
+            </Box>
+            <Typography variant="body2">{category}</Typography>
+          </Box>
+        ))}
+      </Paper>
+    </div>
+  );
 };
 
 export default MapboxComponent;
