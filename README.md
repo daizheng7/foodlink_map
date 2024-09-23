@@ -1,6 +1,6 @@
 # FoodLink Store Finder
 
-This project is a web application that helps users find food resources in their area, inspired by the [FoodLink WVU project](https://foodlink.wvu.edu/pages/find-food). It provides an interactive map and search functionality to locate stores, food pantries, and other food resources.
+This project is a web application that helps users find food resources in their area, part of the [FoodLink WVU project](https://foodlink.wvu.edu/pages/find-food). It provides an interactive map and search functionality to locate stores, food pantries, and other food resources.
 
 ## Features
 
